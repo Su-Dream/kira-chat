@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KiraChat - 二次元AI对话</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- 图标库 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css">
+</head>
+
+<body>
+  <div id="app" :class="{'dark-theme': darkMode}">
+    <!-- 移动端樱花图标 -->
+    <div class="mobile-logo" v-if="isMobile" @click="toggleSidebar">
+      <span class="logo-icon">🌸</span>
+    </div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar" :class="{'sidebar-collapsed': isMobile && sidebarCollapsed, 'sidebar-mobile': isMobile}">
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">🌸</span>
+          <span class="logo-text" v-if="!(isMobile && sidebarCollapsed)">KiraChat</span>
+        </div>
+        <button class="new-chat-btn" @click="createNewChat" v-if="!(isMobile && sidebarCollapsed)">
+          <i class="ri-add-line"></i> 新对话
+        </button>
+        <button class="toggle-sidebar-btn" v-if="isMobile" @click="toggleSidebar">
+          <i :class="sidebarCollapsed ? 'ri-menu-line' : 'ri-close-line'"></i>
+        </button>
+      </div>
+
+      <div class="history-container" v-if="!(isMobile && sidebarCollapsed)">
+        <h3>历史记录</h3>
+        <div class="chat-history">
+          <div v-for="(chat, index) in chatHistory" :key="index" class="history-item"
+            :class="{'active': currentChatIndex === index}" @click="switchChat(index)">
+            <i class="ri-chat-3-line"></i>
+            <span class="history-title">{{ chat.title || '新对话' }}</span>
+            <div class="history-actions">
+              <button @click.stop="deleteChat(index)" class="delete-btn">
+                <i class="ri-delete-bin-line"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer" v-if="!(isMobile && sidebarCollapsed)">
+        <button class="theme-toggle" @click="toggleTheme">
+          <i :class="darkMode ? 'ri-sun-line' : 'ri-moon-line'"></i>
+          {{ darkMode ? '明亮模式' : '暗黑模式' }}
+        </button>
+        <button class="api-config-btn" @click="toggleApiConfig">
+          <i class="ri-settings-3-line"></i>
+          API设置
+        </button>
+      </div>
+    </div>
+
+    <!-- 主聊天界面 -->
+    <div class="main-content" :class="{'main-content-mobile': isMobile && !sidebarCollapsed}">
+      <div class="chat-container">
+        <!-- 欢迎界面 -->
+        <div class="welcome-screen" v-if="currentChat.messages.length === 0">
+          <div class="welcome-content">
+            <div class="mascot">
+              <img src="images/ass.jpg" alt="Kira">
+            </div>
+            <h1>欢迎使用 KiraChat</h1>
+            <p>您的二次元AI助手，随时为您提供帮助和陪伴~</p>
+            <div class="api-status" v-if="apiConfig.isConfigured">
+              <div class="api-badge">
+                <i class="ri-check-line"></i> 已连接到硅基流动
+              </div>
+              <p>当前模型: {{ apiConfig.model }}</p>
+              <p v-if="apiConfig.systemPrompt" class="prompt-info">
+                <i class="ri-chat-smile-2-line"></i> 已设置预设提示词
+              </p>
+            </div>
+            <div class="suggestion-chips">
+              <button @click="sendMessage('你能做什么？')" class="chip">你能做什么？</button>
+              <button @click="sendMessage('讲个笑话')" class="chip">讲个笑话</button>
+              <button @click="sendMessage('推荐一部动漫')" class="chip">推荐一部动漫</button>
+              <button @click="sendMessage('今天天气怎么样？')" class="chip">今天天气怎么样？</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 聊天记录 -->
+        <div class="messages-container" ref="messagesContainer" v-else>
+          <div class="virtual-list-container">
+            <div v-for="(message, index) in currentChat.messages" :key="index" class="message" :class="message.role">
+              <div class="message-avatar" v-if="message.role === 'assistant'">
+                <img src="images/ass.jpg" alt="AI">
+              </div>
+              <div class="message-content">
+                <div class="message-bubble">
+                  <div class="message-text" v-html="formatMessage(message.content)"></div>
+                </div>
+                <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+              </div>
+            </div>
+            <div class="typing-indicator" v-if="isTyping">
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+              <div class="typing-dot"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 输入框区域 -->
+      <div class="input-container">
+        <div class="input-wrapper">
+          <textarea ref="messageInput" v-model="userInput" @keydown.enter.prevent="handleEnterKey"
+            placeholder="输入消息，按Enter发送..." class="message-input" rows="1">
+          </textarea>
+          <button class="send-button" @click="sendMessage()" :disabled="isTyping || !userInput.trim()">
+            <i class="ri-send-plane-fill"></i>
+          </button>
+          <button v-if="isTyping" class="stop-button" @click="stopTyping">
+            <i class="ri-stop-circle-fill"></i>
+          </button>
+        </div>
+        <div class="footer-note">
+          KiraChat 可能会犯错。请考虑核实重要信息。
+          <span v-if="apiConfig.isConfigured" class="api-note">
+            <i class="ri-cloud-line"></i> 已连接到硅基流动
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- API配置弹窗 -->
+    <div class="api-config-modal" v-if="apiConfig.showConfig">
+      <div class="api-config-content">
+        <h2>硅基流动 API 设置</h2>
+        <div class="form-group">
+          <label for="api-key">API 密钥</label>
+          <input type="password" id="api-key" v-model="apiConfig.apiKey" placeholder="请输入您的硅基流动API密钥">
+        </div>
+        <div class="form-group">
+          <label for="api-model">模型</label>
+          <div v-if="apiConfig.isLoadingModels" class="loading-models">
+            <span>正在加载模型列表...</span>
+          </div>
+          <select id="api-model" v-model="apiConfig.model" v-else>
+            <option v-for="model in apiConfig.availableModels" :key="model.id" :value="model.id">
+              {{ model.id }}
+            </option>
+            <!-- 如果没有获取到模型，显示默认选项 -->
+            <option v-if="apiConfig.availableModels.length === 0" value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B-Instruct
+            </option>
+          </select>
+          <div v-if="apiConfig.modelLoadError" class="model-error">
+            {{ apiConfig.modelLoadError }}
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="api-temperature">温度 ({{ apiConfig.temperature }})</label>
+          <input type="range" id="api-temperature" v-model="apiConfig.temperature" min="0" max="1" step="0.1">
+        </div>
+        <div class="form-group">
+          <label for="api-prompt">预设提示词</label>
+          <textarea id="api-prompt" v-model="apiConfig.systemPrompt" placeholder="在此输入预设提示词，将在每次对话开始时发送给AI"
+            rows="3"></textarea>
+          <div class="prompt-tip">提示：可以设置AI的角色、风格、限制等，例如"你是一个可爱的二次元角色，说话要活泼可爱"</div>
+        </div>
+        <div class="form-actions">
+          <button class="cancel-btn" @click="apiConfig.showConfig = false">取消</button>
+          <button class="refresh-btn" @click="fetchAvailableModels"
+            :disabled="!apiConfig.apiKey || apiConfig.isLoadingModels">
+            <i class="ri-refresh-line"></i> 刷新模型列表
+          </button>
+          <button class="save-btn" @click="saveApiConfig">保存</button>
+        </div>
+        <div class="api-info">
+          <p>如何获取API密钥？</p>
+          <ol>
+            <li>登录<a href="https://cloud.siliconflow.cn/i/hnFF8lih" target="_blank">SiliconCloud</a>（若未注册首次登录会自动注册账号）
+            </li>
+            <li>访问<a href="https://cloud.siliconflow.cn/account/ak" target="_blank">API 密钥</a>新建或复制已有密钥</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- 移动端侧边栏遮罩层 -->
+    <div class="sidebar-overlay" v-if="isMobile && !sidebarCollapsed" @click="toggleSidebar"></div>
+
+    <!-- API配置遮罩层 -->
+    <div class="modal-overlay" v-if="apiConfig.showConfig" @click="apiConfig.showConfig = false"></div>
+  </div>
+
+  <script src="js/main.js"></script>
+</body>
+
+</html>

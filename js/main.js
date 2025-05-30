@@ -1,0 +1,651 @@
+// Vue应用
+const { createApp, ref, reactive, computed, nextTick, onMounted, watch } = Vue;
+
+const app = createApp({
+  setup() {
+    // 基础状态
+    const darkMode = ref(localStorage.getItem("darkMode") === "true");
+    const isMobile = ref(window.innerWidth <= 768);
+    const sidebarCollapsed = ref(isMobile.value);
+    const isTyping = ref(false);
+    const userInput = ref("");
+    const messageInput = ref(null);
+    const messagesContainer = ref(null);
+    const aiResponseController = ref(null);
+
+    // 硅基流动API配置
+    const apiConfig = reactive({
+      apiKey: localStorage.getItem("siliconflow_api_key") || "",
+      apiUrl: "https://api.siliconflow.cn/v1/chat/completions",
+      model:
+        localStorage.getItem("siliconflow_model") || "Qwen/Qwen2.5-7B-Instruct",
+      temperature: 0.7,
+      systemPrompt: localStorage.getItem("siliconflow_system_prompt") || "",
+      isConfigured: !!localStorage.getItem("siliconflow_api_key"),
+      showConfig: false,
+      availableModels: [],
+      isLoadingModels: false,
+      modelLoadError: "",
+    });
+
+    // 聊天历史和当前聊天
+    const chatHistory = ref(
+      JSON.parse(localStorage.getItem("chatHistory")) || []
+    );
+    const currentChatIndex = ref(0);
+
+    // 如果没有聊天历史，创建一个新的聊天
+    if (chatHistory.value.length === 0) {
+      createNewChat();
+    }
+
+    // 计算当前聊天
+    const currentChat = computed(() => {
+      return chatHistory.value[currentChatIndex.value] || { messages: [] };
+    });
+
+    // 创建新聊天
+    function createNewChat() {
+      chatHistory.value.unshift({
+        id: Date.now(),
+        title: "",
+        messages: [],
+        createdAt: new Date().toISOString(),
+      });
+      currentChatIndex.value = 0;
+      saveChatsToLocalStorage();
+    }
+
+    // 删除聊天
+    function deleteChat(index) {
+      if (chatHistory.value.length === 1) {
+        // 如果只有一个聊天，清空它而不是删除
+        chatHistory.value[0].messages = [];
+        chatHistory.value[0].title = "";
+        currentChatIndex.value = 0;
+      } else {
+        chatHistory.value.splice(index, 1);
+        // 如果删除的是当前聊天，设置当前聊天为第一个
+        if (index === currentChatIndex.value) {
+          currentChatIndex.value = 0;
+        } else if (index < currentChatIndex.value) {
+          // 如果删除的聊天在当前聊天之前，更新索引
+          currentChatIndex.value--;
+        }
+      }
+      saveChatsToLocalStorage();
+    }
+
+    // 切换聊天
+    function switchChat(index) {
+      currentChatIndex.value = index;
+      // 移动端自动收起侧边栏
+      if (isMobile.value) {
+        sidebarCollapsed.value = true;
+      }
+      // 滚动到底部
+      nextTick(() => {
+        scrollToBottom();
+      });
+    }
+
+    // 切换主题
+    function toggleTheme() {
+      darkMode.value = !darkMode.value;
+      localStorage.setItem("darkMode", darkMode.value);
+    }
+
+    // 切换侧边栏
+    function toggleSidebar() {
+      // 只在移动端允许切换侧边栏
+      if (isMobile.value) {
+        sidebarCollapsed.value = !sidebarCollapsed.value;
+      }
+    }
+
+    // 切换API配置面板
+    function toggleApiConfig() {
+      apiConfig.showConfig = !apiConfig.showConfig;
+
+      // 如果打开配置面板且有API密钥，尝试获取可用模型
+      if (
+        apiConfig.showConfig &&
+        apiConfig.apiKey &&
+        apiConfig.availableModels.length === 0
+      ) {
+        fetchAvailableModels();
+      }
+    }
+
+    // 从硅基流动API获取可用模型列表
+    async function fetchAvailableModels() {
+      if (!apiConfig.apiKey) return;
+
+      apiConfig.isLoadingModels = true;
+      apiConfig.modelLoadError = "";
+
+      try {
+        // 调用硅基流动的模型列表API
+        const response = await fetch("https://api.siliconflow.cn/v1/models", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${apiConfig.apiKey}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `获取模型列表失败: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+
+        if (data && data.data) {
+          // 过滤出聊天模型
+          const chatModels = data.data.filter(
+            model =>
+              model.id.includes("Chat") ||
+              model.id.includes("chat") ||
+              model.id.includes("Instruct") ||
+              model.id.includes("instruct")
+          );
+
+          // 排序模型（按提供商分组）
+          apiConfig.availableModels = chatModels.sort((a, b) => {
+            // 首先按提供商排序
+            const providerA = a.id.split("/")[0];
+            const providerB = b.id.split("/")[0];
+            if (providerA !== providerB) {
+              return providerA.localeCompare(providerB);
+            }
+            // 然后按模型名称排序
+            return a.id.localeCompare(b.id);
+          });
+        } else {
+          apiConfig.availableModels = [];
+          apiConfig.modelLoadError = "无法解析模型列表数据";
+        }
+      } catch (error) {
+        console.error("获取模型列表失败:", error);
+        apiConfig.modelLoadError = `获取模型列表失败: ${error.message}`;
+
+        // 添加默认模型作为备用
+        apiConfig.availableModels = [
+          { id: "Qwen/Qwen2.5-7B-Instruct", object: "model" },
+          { id: "Qwen/Qwen2.5-72B-Instruct", object: "model" },
+          { id: "Qwen/Qwen1.5-7B-Chat", object: "model" },
+          { id: "Qwen/Qwen1.5-14B-Chat", object: "model" },
+          { id: "Qwen/Qwen1.5-32B-Chat", object: "model" },
+          { id: "Qwen/Qwen1.5-72B-Chat", object: "model" },
+          { id: "Baichuan/Baichuan2-13B-Chat", object: "model" },
+          { id: "Yi/Yi-34B-Chat", object: "model" },
+        ];
+      } finally {
+        apiConfig.isLoadingModels = false;
+      }
+    }
+
+    // 保存API配置
+    function saveApiConfig() {
+      localStorage.setItem("siliconflow_api_key", apiConfig.apiKey);
+      localStorage.setItem("siliconflow_model", apiConfig.model);
+      localStorage.setItem("siliconflow_system_prompt", apiConfig.systemPrompt);
+      apiConfig.isConfigured = !!apiConfig.apiKey;
+      apiConfig.showConfig = false;
+    }
+
+    // 保存聊天到本地存储
+    function saveChatsToLocalStorage() {
+      localStorage.setItem("chatHistory", JSON.stringify(chatHistory.value));
+    }
+
+    // 处理Enter键发送
+    function handleEnterKey(event) {
+      if (event.shiftKey) {
+        // 如果按住Shift，允许换行
+        return;
+      }
+      event.preventDefault();
+      sendMessage();
+    }
+
+    // 调整文本区域高度
+    function adjustTextareaHeight() {
+      const textarea = messageInput.value;
+      if (!textarea) return;
+
+      textarea.style.height = "auto";
+      const newHeight = Math.min(textarea.scrollHeight, 120); // 最大高度120px
+      textarea.style.height = `${newHeight}px`;
+    }
+
+    // 滚动到底部
+    function scrollToBottom() {
+      if (messagesContainer.value) {
+        messagesContainer.value.scrollTop =
+          messagesContainer.value.scrollHeight;
+      }
+    }
+
+    // 格式化消息内容（支持Markdown简单格式）
+    function formatMessage(text) {
+      if (!text) return "";
+
+      // 简单的Markdown解析
+      return text
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>") // 粗体
+        .replace(/\*(.*?)\*/g, "<em>$1</em>") // 斜体
+        .replace(/`(.*?)`/g, "<code>$1</code>") // 代码
+        .replace(/\n/g, "<br>"); // 换行
+    }
+
+    // 格式化时间
+    function formatTime(timestamp) {
+      if (!timestamp) return "";
+
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    // 发送消息
+    async function sendMessage(presetMessage) {
+      // 如果正在打字，不允许发送
+      if (isTyping.value) return;
+
+      const messageText = presetMessage || userInput.value.trim();
+      if (!messageText) return;
+
+      // 添加用户消息
+      currentChat.value.messages.push({
+        role: "user",
+        content: messageText,
+        timestamp: new Date().toISOString(),
+      });
+
+      // 清空输入框
+      userInput.value = "";
+
+      // 调整输入框高度
+      if (messageInput.value) {
+        messageInput.value.style.height = "auto";
+      }
+
+      // 保存聊天
+      saveChatsToLocalStorage();
+
+      // 滚动到底部
+      nextTick(() => {
+        scrollToBottom();
+      });
+
+      // 更新聊天标题（如果是第一条消息）
+      if (currentChat.value.messages.length === 1) {
+        const title =
+          messageText.length > 20
+            ? messageText.substring(0, 20) + "..."
+            : messageText;
+        currentChat.value.title = title;
+        saveChatsToLocalStorage();
+      }
+
+      // 显示AI正在输入
+      isTyping.value = true;
+
+      // 准备AI回复
+      nextTick(() => {
+        if (apiConfig.isConfigured) {
+          generateSiliconFlowResponse();
+        } else {
+          generateAIResponse(messageText);
+        }
+      });
+    }
+
+    // 调用硅基流动API获取回复
+    async function generateSiliconFlowResponse() {
+      try {
+        // 创建一个AbortController用于取消请求
+        aiResponseController.value = new AbortController();
+        const signal = aiResponseController.value.signal;
+
+        // 添加一个空的AI消息
+        const aiMessageIndex = currentChat.value.messages.length;
+        currentChat.value.messages.push({
+          role: "assistant",
+          content: "",
+          timestamp: new Date().toISOString(),
+        });
+
+        // 准备对话历史
+        let messages = [];
+
+        // 如果存在系统提示词且这是对话中的第一条消息，添加系统消息
+        if (apiConfig.systemPrompt && currentChat.value.messages.length <= 2) {
+          messages.push({
+            role: "system",
+            content: apiConfig.systemPrompt,
+          });
+        }
+
+        // 添加用户消息历史
+        messages = messages.concat(
+          currentChat.value.messages.slice(0, -1).map(msg => ({
+            role: msg.role,
+            content: msg.content,
+          }))
+        );
+
+        // 准备请求体
+        const requestBody = {
+          model: apiConfig.model,
+          messages: messages,
+          temperature: apiConfig.temperature,
+          stream: true,
+        };
+
+        // 发送请求
+        const response = await fetch(apiConfig.apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiConfig.apiKey}`,
+          },
+          body: JSON.stringify(requestBody),
+          signal: signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `API请求失败: ${response.status} ${response.statusText}`
+          );
+        }
+
+        // 处理流式响应
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let currentResponse = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done || signal.aborted) break;
+
+          // 解码响应
+          const chunk = decoder.decode(value);
+
+          // 处理SSE格式
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("data: ") && line !== "data: [DONE]") {
+              try {
+                const data = JSON.parse(line.substring(6));
+                if (
+                  data.choices &&
+                  data.choices[0].delta &&
+                  data.choices[0].delta.content
+                ) {
+                  const content = data.choices[0].delta.content;
+                  currentResponse += content;
+                  currentChat.value.messages[aiMessageIndex].content =
+                    currentResponse;
+
+                  // 滚动到底部
+                  scrollToBottom();
+                }
+              } catch (e) {
+                console.error("解析SSE数据失败:", e);
+              }
+            }
+          }
+
+          // 保存到本地存储
+          saveChatsToLocalStorage();
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("调用硅基流动API时发生错误:", error);
+
+          // 添加错误信息
+          if (
+            currentChat.value.messages.length > 0 &&
+            currentChat.value.messages[currentChat.value.messages.length - 1]
+              .role === "assistant"
+          ) {
+            currentChat.value.messages[
+              currentChat.value.messages.length - 1
+            ].content += "\n\n[API调用失败，请检查API配置或网络连接]";
+          }
+        }
+      } finally {
+        isTyping.value = false;
+        aiResponseController.value = null;
+        scrollToBottom();
+        saveChatsToLocalStorage();
+      }
+    }
+
+    // 模拟AI流式响应（生产环境中应该连接到真实的AI API）
+    async function generateAIResponse(userMessage) {
+      try {
+        // 创建一个AbortController用于取消请求
+        aiResponseController.value = new AbortController();
+        const signal = aiResponseController.value.signal;
+
+        // 添加一个空的AI消息
+        const aiMessageIndex = currentChat.value.messages.length;
+        currentChat.value.messages.push({
+          role: "assistant",
+          content: "",
+          timestamp: new Date().toISOString(),
+        });
+
+        // 基于用户输入生成一个模拟的回复
+        let aiResponse = "";
+
+        // 获取当前是否是对话的第一条消息
+        const isFirstMessage = currentChat.value.messages.length <= 2;
+
+        // 如果有系统提示词且是第一条消息，根据提示词调整回复风格
+        if (isFirstMessage && apiConfig.systemPrompt) {
+          // 在模拟模式下，简单地在回复前添加一个说明
+          aiResponse = `[根据预设提示词: "${apiConfig.systemPrompt.substring(
+            0,
+            50
+          )}${apiConfig.systemPrompt.length > 50 ? "..." : ""}"]\n\n`;
+        }
+
+        // 模拟回复内容（在实际应用中，这里应该调用AI API）
+        if (userMessage.includes("你能做什么")) {
+          aiResponse =
+            "我是一个AI助手，可以陪你聊天、回答问题、讲故事、推荐动漫、解答疑惑等等！\n\n**我擅长的领域**：\n* 回答各种知识问题\n* 提供创意建议\n* 进行日常对话\n* 讲述故事和笑话\n\n有什么我可以帮助你的吗？";
+        } else if (userMessage.includes("笑话")) {
+          aiResponse =
+            "好的，这是一个笑话：\n\n程序员的孩子问爸爸：「爸爸，为什么太阳从东边升起，西边落下？」\n\n程序员思考了一会儿：「嗯...看起来运行正常，别动它。」";
+        } else if (userMessage.includes("动漫")) {
+          aiResponse =
+            "我推荐几部经典动漫：\n\n1. **千与千寻** - 宫崎骏的经典之作\n2. **进击的巨人** - 震撼人心的剧情和战斗场面\n3. **鬼灭之刃** - 精美的画面和感人的故事\n4. **你的名字** - 新海诚导演的浪漫爱情故事\n5. **JOJO的奇妙冒险** - 独特的艺术风格和战斗系统\n\n你喜欢哪种类型的动漫呢？";
+        } else if (userMessage.includes("天气")) {
+          aiResponse =
+            "抱歉，作为一个AI助手，我无法获取实时的天气信息。不过我可以建议你查看天气应用或网站获取最新的天气预报哦！如果你有其他问题，我很乐意帮助你~";
+        } else if (
+          userMessage.includes("API") ||
+          userMessage.includes("硅基流动") ||
+          userMessage.includes("SiliconFlow")
+        ) {
+          aiResponse =
+            "要使用硅基流动API，请点击设置按钮配置您的API密钥和模型。\n\n配置步骤：\n1. 在SiliconCloud获取API密钥\n2. 在设置中输入API密钥\n3. 选择您想使用的模型\n4. 保存设置\n\n配置完成后，我将通过硅基流动的AI模型为您提供回答！";
+        } else {
+          aiResponse =
+            "谢谢你的消息！我是KiraChat的AI助手，很高兴能和你聊天。有什么我能帮到你的吗？无论是日常问题，还是你想听一个有趣的故事，又或者只是想找人聊聊天，我都在这里陪着你~";
+        }
+
+        // 模拟流式输出
+        let currentResponse = "";
+        const words = aiResponse.split("");
+
+        for (let i = 0; i < words.length; i++) {
+          // 检查是否被取消
+          if (signal.aborted) {
+            break;
+          }
+
+          // 添加字符并更新界面
+          currentResponse += words[i];
+          currentChat.value.messages[aiMessageIndex].content = currentResponse;
+
+          // 保存到本地存储
+          if (i % 10 === 0) {
+            // 每10个字符保存一次，减少性能压力
+            saveChatsToLocalStorage();
+          }
+
+          // 滚动到底部
+          if (i % 5 === 0) {
+            // 每5个字符滚动一次
+            scrollToBottom();
+          }
+
+          // 模拟打字速度
+          await new Promise(resolve =>
+            setTimeout(resolve, 30 + Math.random() * 30)
+          );
+        }
+
+        // 完成打字
+        saveChatsToLocalStorage();
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.error("生成AI响应时发生错误:", error);
+
+          // 添加错误信息
+          if (
+            currentChat.value.messages.length > 0 &&
+            currentChat.value.messages[currentChat.value.messages.length - 1]
+              .role === "assistant"
+          ) {
+            currentChat.value.messages[
+              currentChat.value.messages.length - 1
+            ].content += "\n\n[发生错误，请重试]";
+          }
+        }
+      } finally {
+        isTyping.value = false;
+        aiResponseController.value = null;
+        scrollToBottom();
+      }
+    }
+
+    // 停止AI打字
+    function stopTyping() {
+      if (aiResponseController.value) {
+        aiResponseController.value.abort();
+        aiResponseController.value = null;
+        isTyping.value = false;
+      }
+    }
+
+    // 监听用户输入变化，调整文本区域高度
+    watch(userInput, () => {
+      nextTick(() => {
+        adjustTextareaHeight();
+      });
+    });
+
+    // 监听窗口大小变化
+    onMounted(() => {
+      // 应用保存的主题设置
+      document.documentElement.classList.toggle("dark-theme", darkMode.value);
+
+      // 监听窗口大小变化
+      window.addEventListener("resize", () => {
+        const wasMobile = isMobile.value;
+        isMobile.value = window.innerWidth <= 768;
+
+        // 设备类型改变时处理侧边栏状态
+        if (wasMobile !== isMobile.value) {
+          if (isMobile.value) {
+            // 从PC切换到移动端时，收起侧边栏
+            sidebarCollapsed.value = true;
+          } else {
+            // 从移动端切换到PC时，展开侧边栏
+            sidebarCollapsed.value = false;
+          }
+        }
+      });
+
+      // 调整初始高度
+      adjustTextareaHeight();
+
+      // 初始滚动到底部
+      scrollToBottom();
+
+      // 如果已配置API，尝试预加载模型列表
+      if (apiConfig.isConfigured) {
+        fetchAvailableModels();
+      }
+    });
+
+    // 监听暗黑模式变化
+    watch(darkMode, newVal => {
+      document.documentElement.classList.toggle("dark-theme", newVal);
+    });
+
+    // 监听API密钥变化
+    watch(
+      () => apiConfig.apiKey,
+      newVal => {
+        if (newVal) {
+          // 当API密钥输入后，尝试获取模型列表
+          fetchAvailableModels();
+        } else {
+          // 清空模型列表
+          apiConfig.availableModels = [];
+        }
+      }
+    );
+
+    return {
+      // 状态
+      darkMode,
+      sidebarCollapsed,
+      isTyping,
+      userInput,
+      chatHistory,
+      currentChatIndex,
+      currentChat,
+      messageInput,
+      messagesContainer,
+      isMobile,
+      apiConfig,
+
+      // 方法
+      createNewChat,
+      deleteChat,
+      switchChat,
+      toggleTheme,
+      toggleSidebar,
+      sendMessage,
+      handleEnterKey,
+      formatMessage,
+      formatTime,
+      stopTyping,
+      toggleApiConfig,
+      saveApiConfig,
+      fetchAvailableModels,
+    };
+  },
+}).mount("#app");
+
+// 实现自动调整文本区域高度
+document.addEventListener("DOMContentLoaded", () => {
+  const textAreas = document.querySelectorAll("textarea");
+  textAreas.forEach(textarea => {
+    textarea.addEventListener("input", function () {
+      this.style.height = "auto";
+      this.style.height = this.scrollHeight + "px";
+    });
+  });
+});
