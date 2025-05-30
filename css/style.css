@@ -678,6 +678,7 @@ button:disabled {
   color: var(--text-secondary);
   margin-top: 0.8rem;
   display: flex;
+  flex-direction: row;
   justify-content: center;
   align-items: center;
   gap: 0.5rem;
@@ -1015,6 +1016,10 @@ button:disabled {
 
   .message-bubble {
     padding: 0.7rem 1rem;
+  }
+
+  .footer-note {
+    flex-direction: column;
   }
 }
 
