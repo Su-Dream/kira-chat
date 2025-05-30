@@ -646,7 +646,8 @@ button:disabled {
   resize: none;
   max-height: 120px;
   padding: 0.3rem 0;
-  font-family: inherit;
+  font-weight: bold;
+  font-family: "微软雅黑", Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .message-input::placeholder {
