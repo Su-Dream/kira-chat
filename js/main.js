@@ -13,6 +13,14 @@ const app = createApp({
     const aiResponseController = ref(null);
     const apiKeyDebounceTimer = ref(null);
 
+    // 提示状态
+    const toast = reactive({
+      show: false,
+      message: "",
+      type: "success", // success, error, info
+      timer: null,
+    });
+
     // 硅基流动API配置
     const apiConfig = reactive({
       apiKey: localStorage.getItem("siliconflow_api_key") || "",
@@ -54,10 +62,23 @@ const app = createApp({
       });
       currentChatIndex.value = 0;
       saveChatsToLocalStorage();
+
+      // 显示创建成功提示
+      showToast("已创建新对话", "success");
+
+      // 移动端自动收起侧边栏
+      if (isMobile.value) {
+        sidebarCollapsed.value = true;
+      }
     }
 
     // 删除聊天
     function deleteChat(index) {
+      // 显示确认对话框
+      if (!confirm("确定要删除这个对话吗？")) {
+        return;
+      }
+
       if (chatHistory.value.length === 1) {
         // 如果只有一个聊天，清空它而不是删除
         chatHistory.value[0].messages = [];
@@ -74,6 +95,9 @@ const app = createApp({
         }
       }
       saveChatsToLocalStorage();
+
+      // 显示删除成功提示
+      showToast("对话已删除", "info");
     }
 
     // 切换聊天
@@ -209,6 +233,14 @@ const app = createApp({
       localStorage.setItem("siliconflow_system_prompt", apiConfig.systemPrompt);
       apiConfig.isConfigured = !!apiConfig.apiKey;
       apiConfig.showConfig = false;
+
+      // 显示保存成功提示
+      showToast("设置已保存", "success");
+
+      // 移动端自动收起侧边栏
+      if (isMobile.value) {
+        sidebarCollapsed.value = true;
+      }
     }
 
     // 保存聊天到本地存储
@@ -647,6 +679,39 @@ const app = createApp({
       }
     );
 
+    // 显示提示
+    function showToast(message, type = "success", duration = 3000) {
+      // 如果已有提示，先清除定时器
+      if (toast.timer) {
+        clearTimeout(toast.timer);
+      }
+
+      // 设置提示内容
+      toast.show = true;
+      toast.message = message;
+      toast.type = type;
+
+      // 设置自动关闭
+      toast.timer = setTimeout(() => {
+        toast.show = false;
+      }, duration);
+    }
+
+    // 刷新模型列表并显示提示
+    async function refreshModelList() {
+      if (!apiConfig.apiKey) {
+        showToast("请先输入API密钥", "error");
+        return;
+      }
+
+      try {
+        await fetchAvailableModels();
+        showToast("模型列表已刷新", "success");
+      } catch (error) {
+        showToast("刷新模型列表失败", "error");
+      }
+    }
+
     return {
       // 状态
       darkMode,
@@ -660,6 +725,7 @@ const app = createApp({
       messagesContainer,
       isMobile,
       apiConfig,
+      toast,
 
       // 方法
       createNewChat,
@@ -676,6 +742,8 @@ const app = createApp({
       saveApiConfig,
       fetchAvailableModels,
       debouncedFetchModels,
+      showToast,
+      refreshModelList,
     };
   },
 }).mount("#app");

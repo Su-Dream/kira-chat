@@ -14,6 +14,16 @@
 
 <body>
   <div id="app" :class="{'dark-theme': darkMode}">
+    <!-- 提示组件 -->
+    <div class="toast-container" :class="{'mobile': isMobile}">
+      <div class="toast" v-if="toast.show" :class="toast.type">
+        <i class="ri-checkbox-circle-line" v-if="toast.type === 'success'"></i>
+        <i class="ri-error-warning-line" v-if="toast.type === 'error'"></i>
+        <i class="ri-information-line" v-if="toast.type === 'info'"></i>
+        <span>{{ toast.message }}</span>
+      </div>
+    </div>
+
     <!-- 移动端樱花图标 -->
     <div class="mobile-logo" v-if="isMobile" @click="toggleSidebar">
       <span class="logo-icon">🌸</span>
@@ -174,7 +184,7 @@
         </div>
         <div class="form-actions">
           <button class="cancel-btn" @click="apiConfig.showConfig = false">取消</button>
-          <button class="refresh-btn" @click="fetchAvailableModels"
+          <button class="refresh-btn" @click="refreshModelList"
             :disabled="!apiConfig.apiKey || apiConfig.isLoadingModels">
             <i class="ri-refresh-line"></i> 刷新模型列表
           </button>
