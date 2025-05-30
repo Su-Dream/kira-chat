@@ -37,7 +37,7 @@
           <span class="logo-text" v-if="!(isMobile && sidebarCollapsed)">KiraChat</span>
         </div>
         <button class="new-chat-btn" @click="createNewChat" v-if="!(isMobile && sidebarCollapsed)">
-          <i class="ri-add-line"></i> 新对话
+          <span style="font-weight: bold;">+</span> 新对话
         </button>
         <button class="toggle-sidebar-btn" v-if="isMobile" @click="toggleSidebar">
           <i :class="sidebarCollapsed ? 'ri-menu-line' : 'ri-close-line'"></i>
