@@ -9,7 +9,6 @@
   <meta name="keywords"
     content="AI猫娘,二次元聊天,AI聊天,AI角色,AI陪伴,AI对话,AI助手,AI猫娘聊天,AI女仆聊天,AI傲娇娘聊天,AI猫娘对话,AI女仆对话,AI傲娇娘对话,AI猫娘助手,AI女仆助手,AI傲娇娘助手,AI猫娘聊天机器人,AI女仆聊天机器人,AI傲娇娘聊天机器人,AI猫娘对话机器人,AI女仆对话机器人,AI傲娇娘对话机器人,AI猫娘聊天平台,AI女仆聊天平台,AI傲娇娘聊天平台,AI猫娘聊天网站,AI女仆聊天网站,AI傲娇娘聊天网站,AI猫娘聊天应用,AI女仆聊天应用,AI傲娇娘聊天应用,AI猫娘聊天软件,AI女仆聊天软件,AI傲娇娘聊天软件,AI猫娘聊天工具,AI女仆聊天工具,AI傲娇娘聊天工具,AI猫娘聊天服务,AI女仆聊天服务,AI傲娇娘聊天服务,AI猫娘聊天平台,AI女仆聊天平台,AI傲娇娘聊天平台,AI猫娘聊天网站,AI女仆聊天网站,AI傲娇娘聊天网站,AI猫娘聊天应用,AI女仆聊天应用,AI傲娇娘聊天应用,AI猫娘聊天软件,AI女仆聊天软件,AI傲娇娘聊天软件,AI猫娘聊天工具,AI女仆聊天工具,AI傲娇娘聊天工具,AI猫娘聊天服务,AI女仆聊天服务,AI傲娇娘聊天服务">
   <link rel="stylesheet" href="./css/style.css">
-  <link rel="stylesheet" href="./css/kira.css">
   <!-- Vue 3 CDN -->
   <script src="./js/vue.global.js"></script>
   <!-- 图标库 -->
@@ -169,7 +168,7 @@
               {{ model.id }}
             </option>
             <!-- 如果没有获取到模型，显示默认选项 -->
-            <option v-if="apiConfig.availableModels.length === 0" value="Qwen/Qwen2.5-7B-Instruct">Qwen2.5-7B-Instruct
+            <option v-if="apiConfig.availableModels.length === 0" value="deepseek-ai/DeepSeek-V3">DeepSeek-V3
             </option>
           </select>
           <div v-if="apiConfig.modelLoadError" class="model-error">
