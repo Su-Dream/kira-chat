@@ -904,6 +904,9 @@ button:disabled {
   .api-config-modal {
     width: 95%;
   }
+  .footer-note {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 480px) {

@@ -53,11 +53,11 @@
       <div class="sidebar-footer" v-if="!(isMobile && sidebarCollapsed)">
         <button class="theme-toggle" @click="toggleTheme">
           <i :class="darkMode ? 'ri-sun-line' : 'ri-moon-line'"></i>
-          {{ darkMode ? '明亮模式' : '暗黑模式' }}
+          {{ darkMode ? '白天模式' : '夜晚模式' }}
         </button>
         <button class="api-config-btn" @click="toggleApiConfig">
           <i class="ri-settings-3-line"></i>
-          API设置
+          系统设置
         </button>
       </div>
     </div>
@@ -72,7 +72,8 @@
               <img src="images/ass.jpg" alt="Kira">
             </div>
             <h1>欢迎使用 KiraChat</h1>
-            <p>您的二次元AI助手，随时为您提供帮助和陪伴~</p>
+            <p>基于硅基流动API开发的AI助手。首次使用请先配置API密钥~</p>
+            <p style=" color: red;">所有内容均存储在您的浏览器本地。</p>
             <div class="api-status" v-if="apiConfig.isConfigured">
               <div class="api-badge">
                 <i class="ri-check-line"></i> 已连接到硅基流动
@@ -128,7 +129,7 @@
           </button>
         </div>
         <div class="footer-note">
-          KiraChat 可能会犯错。请考虑核实重要信息。
+          <p>KiraChat 可能会犯错。请考虑核实重要信息。</p>
           <span v-if="apiConfig.isConfigured" class="api-note">
             <i class="ri-cloud-line"></i> 已连接到硅基流动
           </span>
@@ -139,10 +140,10 @@
     <!-- API配置弹窗 -->
     <div class="api-config-modal" v-if="apiConfig.showConfig">
       <div class="api-config-content">
-        <h2>硅基流动 API 设置</h2>
+        <h2>系统设置</h2>
         <div class="form-group">
           <label for="api-key">API 密钥</label>
-          <input type="password" id="api-key" v-model="apiConfig.apiKey" placeholder="请输入您的硅基流动API密钥">
+          <input type="password" id="api-key" v-model="apiConfig.apiKey" placeholder="请输入您的硅基流动API密钥，以sk-开头">
         </div>
         <div class="form-group">
           <label for="api-model">模型</label>
