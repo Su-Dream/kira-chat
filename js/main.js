@@ -223,8 +223,11 @@ const app = createApp({
     // 滚动到底部
     function scrollToBottom() {
       if (messagesContainer.value) {
-        messagesContainer.value.scrollTop =
-          messagesContainer.value.scrollHeight;
+        // 使用setTimeout确保DOM更新后再滚动
+        setTimeout(() => {
+          messagesContainer.value.scrollTop =
+            messagesContainer.value.scrollHeight;
+        }, 10);
       }
     }
 
@@ -422,7 +425,10 @@ const app = createApp({
       } finally {
         isTyping.value = false;
         aiResponseController.value = null;
-        scrollToBottom();
+        // 确保消息完成后滚动到底部
+        nextTick(() => {
+          scrollToBottom();
+        });
         saveChatsToLocalStorage();
       }
     }
@@ -534,7 +540,10 @@ const app = createApp({
       } finally {
         isTyping.value = false;
         aiResponseController.value = null;
-        scrollToBottom();
+        // 确保消息完成后滚动到底部
+        nextTick(() => {
+          scrollToBottom();
+        });
       }
     }
 
@@ -553,6 +562,16 @@ const app = createApp({
         adjustTextareaHeight();
       });
     });
+
+    // 监听消息变化，自动滚动到底部
+    watch(
+      () => currentChat.value.messages.length,
+      () => {
+        nextTick(() => {
+          scrollToBottom();
+        });
+      }
+    );
 
     // 监听窗口大小变化
     onMounted(() => {
@@ -574,6 +593,11 @@ const app = createApp({
             sidebarCollapsed.value = false;
           }
         }
+
+        // 窗口大小变化时，确保滚动到底部
+        nextTick(() => {
+          scrollToBottom();
+        });
       });
 
       // 调整初始高度
