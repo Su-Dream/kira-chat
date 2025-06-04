@@ -1205,3 +1205,31 @@ button:disabled {
   color: var(--text-color);
   border: 1px solid var(--border-color);
 }
+
+/* 思考过程样式 */
+.reasoning-content {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #ddd;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.dark-theme .reasoning-content {
+  color: #aaa;
+  border-bottom-color: #444;
+}
+
+.reasoning-content::before {
+  content: "正在推理：";
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #999;
+}
+
+.dark-theme .reasoning-content::before {
+  color: #888;
+}

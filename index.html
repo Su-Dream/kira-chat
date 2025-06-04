@@ -126,6 +126,9 @@
               </div>
               <div class="message-content">
                 <div class="message-bubble">
+                  <!-- 思考过程，如果有的话 -->
+                  <div v-if="message.reasoning_content" class="reasoning-content"
+                    v-html="formatMessage(message.reasoning_content)"></div>
                   <div class="message-text" v-html="formatMessage(message.content)"></div>
                 </div>
                 <div class="message-time">{{ formatTime(message.timestamp) }}</div>

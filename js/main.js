@@ -435,6 +435,7 @@ const app = createApp({
         currentChat.value.messages.push({
           role: "assistant",
           content: "",
+          reasoning_content: "", // 添加思考过程字段
           timestamp: new Date().toISOString(),
         });
 
@@ -486,6 +487,7 @@ const app = createApp({
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let currentResponse = "";
+        let currentReasoningResponse = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -500,19 +502,30 @@ const app = createApp({
             if (line.startsWith("data: ") && line !== "data: [DONE]") {
               try {
                 const data = JSON.parse(line.substring(6));
-                if (
-                  data.choices &&
-                  data.choices[0].delta &&
-                  data.choices[0].delta.content
-                ) {
-                  const content = data.choices[0].delta.content;
-                  currentResponse += content;
-                  currentChat.value.messages[aiMessageIndex].content =
-                    currentResponse;
 
-                  // 滚动到底部
-                  scrollToBottom();
+                // 检查是否有内容更新
+                if (data.choices && data.choices[0].delta) {
+                  // 处理思考过程内容
+                  if (data.choices[0].delta.reasoning_content !== undefined) {
+                    const reasoningContent =
+                      data.choices[0].delta.reasoning_content || "";
+                    currentReasoningResponse += reasoningContent;
+                    currentChat.value.messages[
+                      aiMessageIndex
+                    ].reasoning_content = currentReasoningResponse;
+                  }
+
+                  // 处理普通内容
+                  if (data.choices[0].delta.content !== undefined) {
+                    const content = data.choices[0].delta.content || "";
+                    currentResponse += content;
+                    currentChat.value.messages[aiMessageIndex].content =
+                      currentResponse;
+                  }
                 }
+
+                // 滚动到底部
+                scrollToBottom();
               } catch (e) {
                 console.error("解析SSE数据失败:", e);
               }
