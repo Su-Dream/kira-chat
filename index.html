@@ -27,6 +27,18 @@
       </div>
     </div>
 
+    <!-- 自定义弹窗组件 -->
+    <div class="custom-modal" v-if="modal.show">
+      <div class="custom-modal-content">
+        <h2>{{ modal.title }}</h2>
+        <p>{{ modal.message }}</p>
+        <div class="modal-actions">
+          <button class="cancel-btn" @click="closeModal(false)">{{ modal.cancelText }}</button>
+          <button class="confirm-btn" @click="closeModal(true)">{{ modal.confirmText }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 移动端樱花图标 -->
     <div class="mobile-logo" v-if="isMobile" @click="toggleSidebar">
       <span class="logo-icon">🌸</span>
@@ -212,6 +224,9 @@
 
     <!-- API配置遮罩层 -->
     <div class="modal-overlay" v-if="apiConfig.showConfig" @click="apiConfig.showConfig = false"></div>
+
+    <!-- 自定义弹窗遮罩层 -->
+    <div class="modal-overlay" v-if="modal.show" @click="closeModal(false)"></div>
   </div>
 
   <script src="js/main.js"></script>
