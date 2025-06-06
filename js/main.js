@@ -700,17 +700,22 @@ const app = createApp({
         });
       }
     );
+    // 设置真实vh
+    function setRealVh() {
+      let vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty("--vh", `${vh}px`);
+    }
 
     // 监听窗口大小变化
     onMounted(() => {
+      setRealVh();
       // 应用保存的主题设置
       document.documentElement.classList.toggle("dark-theme", darkMode.value);
-
       // 监听窗口大小变化
       window.addEventListener("resize", () => {
+        setRealVh();
         const wasMobile = isMobile.value;
         isMobile.value = window.innerWidth <= 768;
-
         // 设备类型改变时处理侧边栏状态
         if (wasMobile !== isMobile.value) {
           if (isMobile.value) {
@@ -721,7 +726,6 @@ const app = createApp({
             sidebarCollapsed.value = false;
           }
         }
-
         // 窗口大小变化时，确保滚动到底部
         nextTick(() => {
           scrollToBottom();
